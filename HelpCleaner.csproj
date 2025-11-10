@@ -1,11 +1,22 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
 
   <PropertyGroup>
+    <!-- Build a Windows executable -->
     <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Optional: auto-publish settings for release -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
   </PropertyGroup>
+
+  <!-- Optional: automatically run publish after build for Release configuration -->
+  <Target Name="AutoPublish" AfterTargets="Build" Condition="'$(Configuration)'=='Release'">
+    <Exec Command="dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true" />
+  </Target>
 
 </Project>
