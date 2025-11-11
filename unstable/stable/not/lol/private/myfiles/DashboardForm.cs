@@ -1,0 +1,158 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Drawing;
+using System.Windows.Forms;
+using HelpCleaner.Cleaner;
+using HelpCleaner.VirtualDrive;
+using HelpCleaner.Storage;
+using HelpCleaner.Utils; // Needed for CleanerUtils
+
+namespace HelpCleaner.Dashboard
+{
+    public class DashboardForm : Form
+    {
+        private Button scanButton;
+        private Button cleanButton;
+        private Button dangerousFilesButton;
+        private Button vhdButton;
+        private Label storageLabel;
+        private StorageAnalyzer storageAnalyzer;
+
+        // New emoji buttons
+        private Button btnClose;
+        private Button btnMinimize;
+        private Button btnInstall;
+
+        public DashboardForm()
+        {
+            this.Text = "HelpCleaner";
+            this.Width = 600;
+            this.Height = 450; // Taller to fit storage info
+
+            storageAnalyzer = new StorageAnalyzer();
+
+            InitializeComponents();
+            UpdateStorageStats();
+        }
+
+        private void InitializeComponents()
+        {
+            // Old working buttons
+            scanButton = new Button() { Text = "Check My System for Viruses", Left = 50, Top = 50, Width = 200 };
+            cleanButton = new Button() { Text = "Clean System", Left = 50, Top = 100, Width = 200 };
+            dangerousFilesButton = new Button() { Text = "Access Dangerous Files", Left = 50, Top = 150, Width = 200 };
+            vhdButton = new Button() { Text = "Manage Virtual Drive", Left = 50, Top = 200, Width = 200 };
+
+            scanButton.Click += ScanButton_Click;
+            cleanButton.Click += CleanButton_Click;
+            dangerousFilesButton.Click += DangerousFilesButton_Click;
+            vhdButton.Click += VhdButton_Click;
+
+            this.Controls.Add(scanButton);
+            this.Controls.Add(cleanButton);
+            this.Controls.Add(dangerousFilesButton);
+            this.Controls.Add(vhdButton);
+
+            // Storage label
+            storageLabel = new Label()
+            {
+                Left = 300,
+                Top = 50,
+                Width = 250,
+                Height = 300,
+                Font = new Font("Arial", 10),
+                Text = "Loading storage info..."
+            };
+            this.Controls.Add(storageLabel);
+
+            // --- New emoji buttons (added on top) ---
+            btnClose = new Button() { Text = "❌", Width = 40, Height = 30, Top = 10, Left = this.ClientSize.Width - 50, FlatStyle = FlatStyle.Flat, BackColor = Color.Transparent };
+            btnClose.Click += (s, e) => this.Close();
+            btnClose.MouseEnter += (s, e) => btnClose.BackColor = Color.Red;
+            btnClose.MouseLeave += (s, e) => btnClose.BackColor = Color.Transparent;
+
+            btnMinimize = new Button() { Text = "➖", Width = 40, Height = 30, Top = 10, Left = this.ClientSize.Width - 100, FlatStyle = FlatStyle.Flat, BackColor = Color.Transparent };
+            btnMinimize.Click += (s, e) => this.WindowState = FormWindowState.Minimized;
+            btnMinimize.MouseEnter += (s, e) => btnMinimize.BackColor = Color.Gray;
+            btnMinimize.MouseLeave += (s, e) => btnMinimize.BackColor = Color.Transparent;
+
+            btnInstall = new Button() { Text = "🛠 Install", Width = 60, Height = 30, Top = 10, Left = this.ClientSize.Width - 170, FlatStyle = FlatStyle.Flat, BackColor = Color.Transparent };
+            btnInstall.Click += (s, e) => MessageBox.Show("Installer requires elevated permissions.", "Install", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            btnInstall.MouseEnter += (s, e) => btnInstall.BackColor = Color.DarkOrange;
+            btnInstall.MouseLeave += (s, e) => btnInstall.BackColor = Color.Transparent;
+
+            this.Controls.Add(btnClose);
+            this.Controls.Add(btnMinimize);
+            this.Controls.Add(btnInstall);
+
+            // Keep emoji buttons in correct position on resize
+            this.Resize += (s, e) =>
+            {
+                btnClose.Left = this.ClientSize.Width - 50;
+                btnMinimize.Left = this.ClientSize.Width - 100;
+                btnInstall.Left = this.ClientSize.Width - 170;
+            };
+        }
+
+        // --- Old working button event handlers ---
+        private void ScanButton_Click(object? sender, EventArgs? e)
+        {
+            var virusScanner = new VirusScanner();
+            virusScanner.ScanSystem();
+            MessageBox.Show("Virus scan completed. Check HelpCleaner.log for details.");
+        }
+
+        private void CleanButton_Click(object? sender, EventArgs? e)
+        {
+            var scanner = new FileScanner();
+            var files = scanner.ScanFiles();
+            scanner.DeleteFilesWithConfirmation(files);
+            MessageBox.Show($"Deleted {files.Count} files (or skipped some). Check HelpCleaner.log for details.");
+        }
+
+        private void DangerousFilesButton_Click(object? sender, EventArgs? e)
+        {
+            var manager = new DangerousFilesManager();
+            string path = "C:\\";
+            var files = manager.ListDangerousFiles(path);
+            string message = files.Count > 0 ? $"Found {files.Count} dangerous files. See HelpCleaner.log for details." : "No dangerous files found.";
+            MessageBox.Show(message);
+        }
+
+        private void VhdButton_Click(object? sender, EventArgs? e)
+        {
+            var vhdManager = new VHDManager();
+            vhdManager.CreateVHD();
+            vhdManager.MountVHD();
+            MessageBox.Show("Virtual Drive created and mounted. Check HelpCleaner.log for details.");
+        }
+
+        private void UpdateStorageStats()
+        {
+            string drivesInfo = "";
+            foreach (var drive in DriveInfo.GetDrives())
+            {
+                if (drive.IsReady)
+                {
+                    double usedPct = storageAnalyzer.GetUsedPercentage(drive.Name);
+                    drivesInfo += $"{drive.Name} - Used: {usedPct:F2}% ({FormatBytes(drive.TotalSize - drive.AvailableFreeSpace)} / {FormatBytes(drive.TotalSize)})\n";
+                }
+            }
+            storageLabel.Text = drivesInfo;
+        }
+
+        private string FormatBytes(long bytes)
+        {
+            string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+            double len = bytes;
+            int order = 0;
+            while (len >= 1024 && order < sizes.Length - 1)
+            {
+                order++;
+                len /= 1024;
+            }
+            return $"{len:F2} {sizes[order]}";
+        }
+    }
+}
