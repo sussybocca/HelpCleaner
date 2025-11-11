@@ -1,6 +1,6 @@
 using System;
-using System.IO;
 using System.Diagnostics;
+using System.IO;
 using HelpCleaner.Utils;
 
 namespace HelpCleaner.VirtualDrive
@@ -20,26 +20,11 @@ namespace HelpCleaner.VirtualDrive
                     return;
                 }
 
-                // Create VHD using diskpart script
                 string script = $"create vdisk file=\"{vhdPath}\" maximum={sizeMB} type=expandable\nattach vdisk\ncreate partition primary\nformat fs=NTFS quick\nassign letter=Z";
                 string scriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "vhd_script.txt");
                 File.WriteAllText(scriptPath, script);
 
-                var process = new Process();
-                process.StartInfo.FileName = "diskpart.exe";
-                process.StartInfo.Arguments = $"/s \"{scriptPath}\"";
-                process.StartInfo.RedirectStandardOutput = true;
-                process.StartInfo.UseShellExecute = false;
-                process.StartInfo.CreateNoWindow = true;
-
-                process.Start();
-                string output = process.StandardOutput.ReadToEnd();
-                process.WaitForExit();
-
-                Logger.Log("VHD created successfully.");
-                Logger.Log(output);
-
-                File.Delete(scriptPath); // Clean up
+                ExecuteDiskPartScript(scriptPath, "VHD created successfully.");
             }
             catch (Exception ex)
             {
@@ -59,21 +44,7 @@ namespace HelpCleaner.VirtualDrive
             string scriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "vhd_mount.txt");
             File.WriteAllText(scriptPath, script);
 
-            var process = new Process();
-            process.StartInfo.FileName = "diskpart.exe";
-            process.StartInfo.Arguments = $"/s \"{scriptPath}\"";
-            process.StartInfo.RedirectStandardOutput = true;
-            process.StartInfo.UseShellExecute = false;
-            process.StartInfo.CreateNoWindow = true;
-
-            process.Start();
-            string output = process.StandardOutput.ReadToEnd();
-            process.WaitForExit();
-
-            Logger.Log("VHD mounted successfully.");
-            Logger.Log(output);
-
-            File.Delete(scriptPath);
+            ExecuteDiskPartScript(scriptPath, "VHD mounted successfully.");
         }
 
         public void DismountVHD()
@@ -88,21 +59,33 @@ namespace HelpCleaner.VirtualDrive
             string scriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "vhd_dismount.txt");
             File.WriteAllText(scriptPath, script);
 
-            var process = new Process();
-            process.StartInfo.FileName = "diskpart.exe";
-            process.StartInfo.Arguments = $"/s \"{scriptPath}\"";
-            process.StartInfo.RedirectStandardOutput = true;
-            process.StartInfo.UseShellExecute = false;
-            process.StartInfo.CreateNoWindow = true;
+            ExecuteDiskPartScript(scriptPath, "VHD dismounted successfully.");
+        }
 
-            process.Start();
-            string output = process.StandardOutput.ReadToEnd();
-            process.WaitForExit();
+        private void ExecuteDiskPartScript(string scriptPath, string successMessage)
+        {
+            try
+            {
+                var process = new Process();
+                process.StartInfo.FileName = "diskpart.exe";
+                process.StartInfo.Arguments = $"/s \"{scriptPath}\"";
+                process.StartInfo.RedirectStandardOutput = true;
+                process.StartInfo.UseShellExecute = false;
+                process.StartInfo.CreateNoWindow = true;
 
-            Logger.Log("VHD dismounted successfully.");
-            Logger.Log(output);
+                process.Start();
+                string output = process.StandardOutput.ReadToEnd();
+                process.WaitForExit();
 
-            File.Delete(scriptPath);
+                Logger.Log(successMessage);
+                Logger.Log(output);
+
+                File.Delete(scriptPath);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"DiskPart execution failed: {ex.Message}");
+            }
         }
     }
 }
