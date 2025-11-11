@@ -1,34 +1,42 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Threading.Tasks;
 using System.Windows.Forms;
+using HelpCleaner.Utils;
 
 namespace HelpCleaner.Cleaner
 {
-    public class FileScanner
+    public class FileScannerWithProgress
     {
         private const long LargeFileThreshold = 1L * 1024 * 1024 * 1024; // 1 GB
         private readonly string logFile = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
             "HelpCleanerDeletedFiles.log");
 
-        /// <summary>
-        /// Scan all drives for files >= 1 GB, show progress, ask confirmation, then delete.
-        /// </summary>
+        private readonly Action<int> progressCallback;
+
+        public FileScannerWithProgress(Action<int> progressCallback)
+        {
+            this.progressCallback = progressCallback;
+        }
+
         public void ScanAndDelete()
         {
             var largeFiles = new List<FileInfo>();
+            var drives = DriveInfo.GetDrives();
+            int totalDrives = drives.Length;
             int driveIndex = 0;
 
-            // Step 1: Scan all drives with progress
-            foreach (var drive in DriveInfo.GetDrives())
+            foreach (var drive in drives)
             {
                 driveIndex++;
                 if (!drive.IsReady) continue;
 
                 try
                 {
-                    AddLargeFilesWithProgress(drive.RootDirectory, largeFiles, driveIndex, DriveInfo.GetDrives().Length);
+                    AddLargeFilesWithProgress(drive.RootDirectory, largeFiles, driveIndex, totalDrives);
                 }
                 catch { /* skip inaccessible drives */ }
             }
@@ -36,10 +44,10 @@ namespace HelpCleaner.Cleaner
             if (largeFiles.Count == 0)
             {
                 MessageBox.Show("No files larger than 1 GB were found.", "Scan Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                progressCallback?.Invoke(100);
                 return;
             }
 
-            // Step 2: Build message for user
             string message = "The following files are larger than 1 GB:\n\n";
             foreach (var fi in largeFiles)
             {
@@ -47,21 +55,22 @@ namespace HelpCleaner.Cleaner
             }
             message += "\n⚠ Are you sure you want to delete these files? Make a backup drive first!";
 
-            // Step 3: Confirm deletion
             var confirm = MessageBox.Show(message, "Confirm Deletion", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
             if (confirm != DialogResult.Yes)
             {
                 MessageBox.Show("Operation cancelled. No files were deleted.", "Cancelled", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                progressCallback?.Invoke(100);
                 return;
             }
 
-            // Step 4: Delete files and log
             int deletedCount = 0;
             long deletedBytes = 0;
             using (StreamWriter log = new StreamWriter(logFile, true))
             {
-                foreach (var fi in largeFiles)
+                int totalFiles = largeFiles.Count;
+                for (int i = 0; i < totalFiles; i++)
                 {
+                    var fi = largeFiles[i];
                     try
                     {
                         File.Delete(fi.FullName);
@@ -73,21 +82,19 @@ namespace HelpCleaner.Cleaner
                     {
                         log.WriteLine($"{DateTime.Now}: Failed to delete {fi.FullName}: {ex.Message}");
                     }
+
+                    int percent = (i + 1) * 100 / totalFiles;
+                    progressCallback?.Invoke(percent);
                 }
             }
 
-            // Step 5: Show summary
             MessageBox.Show(
-                $"Deleted {deletedCount} files, totaling {deletedBytes / (1024 * 1024 * 1024)} GB.\n" +
-                $"Details logged to {logFile}.",
+                $"Deleted {deletedCount} files, totaling {deletedBytes / (1024 * 1024 * 1024)} GB.\nDetails logged to {logFile}.",
                 "Cleanup Complete",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
         }
 
-        /// <summary>
-        /// Recursively scan a directory for large files, showing a progress message box.
-        /// </summary>
         private void AddLargeFilesWithProgress(DirectoryInfo dir, List<FileInfo> filesList, int driveIndex, int totalDrives)
         {
             try
@@ -105,10 +112,66 @@ namespace HelpCleaner.Cleaner
             }
             catch { /* skip inaccessible folders */ }
 
-            // Update user with progress for large scans
+            int progress = driveIndex * 100 / totalDrives;
+            progressCallback?.Invoke(progress);
             Application.DoEvents();
-            string progressMessage = $"Scanning drive {dir.Root.FullName} ({driveIndex}/{totalDrives})...\nFound {filesList.Count} large files so far.";
-            Console.WriteLine(progressMessage); // optional: for console
+        }
+    }
+
+    public class VirusScannerWithProgress
+    {
+        private readonly string defenderPath = @"C:\Program Files\Windows Defender\MpCmdRun.exe";
+        private readonly Action<int> progressCallback;
+
+        public VirusScannerWithProgress(Action<int> progressCallback)
+        {
+            this.progressCallback = progressCallback;
+        }
+
+        public void ScanSystem()
+        {
+            try
+            {
+                if (!File.Exists(defenderPath))
+                {
+                    Logger.Log("Windows Defender executable not found.");
+                    return;
+                }
+
+                Logger.Log("Starting full system scan...");
+
+                var process = new Process();
+                process.StartInfo.FileName = defenderPath;
+                process.StartInfo.Arguments = "-Scan -ScanType 2 -DisableRemediation 0";
+                process.StartInfo.RedirectStandardOutput = true;
+                process.StartInfo.RedirectStandardError = true;
+                process.StartInfo.UseShellExecute = false;
+                process.StartInfo.CreateNoWindow = true;
+
+                process.Start();
+
+                // Fake progress while scanning since Defender doesn't report real-time %
+                int percent = 0;
+                while (!process.HasExited)
+                {
+                    percent = Math.Min(percent + 2, 99); // increase slowly
+                    progressCallback?.Invoke(percent);
+                    System.Threading.Thread.Sleep(200);
+                }
+
+                string output = process.StandardOutput.ReadToEnd();
+                string errors = process.StandardError.ReadToEnd();
+
+                if (!string.IsNullOrWhiteSpace(errors))
+                    Logger.Log("Errors during scan: " + errors);
+
+                Logger.Log("Virus scan completed. Output:\n" + output);
+                progressCallback?.Invoke(100);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Virus scan failed: {ex.Message}");
+            }
         }
     }
 }

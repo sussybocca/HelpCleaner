@@ -8,6 +8,9 @@ namespace HelpCleaner.Cleaner
     {
         private readonly string defenderPath = @"C:\Program Files\Windows Defender\MpCmdRun.exe";
 
+        /// <summary>
+        /// Runs a full system scan and removes detected threats automatically.
+        /// </summary>
         public void ScanSystem()
         {
             try
@@ -18,19 +21,28 @@ namespace HelpCleaner.Cleaner
                     return;
                 }
 
+                Logger.Log("Starting full system scan...");
+
                 var process = new Process();
                 process.StartInfo.FileName = defenderPath;
-                process.StartInfo.Arguments = "-Scan -ScanType 2"; // Full system scan
+
+                // Full scan, remove threats automatically
+                process.StartInfo.Arguments = "-Scan -ScanType 2 -DisableRemediation 0";
                 process.StartInfo.RedirectStandardOutput = true;
+                process.StartInfo.RedirectStandardError = true;
                 process.StartInfo.UseShellExecute = false;
                 process.StartInfo.CreateNoWindow = true;
 
                 process.Start();
+
                 string output = process.StandardOutput.ReadToEnd();
+                string errors = process.StandardError.ReadToEnd();
                 process.WaitForExit();
 
-                Logger.Log("Virus scan completed.");
-                Logger.Log(output);
+                if (!string.IsNullOrWhiteSpace(errors))
+                    Logger.Log("Errors during scan: " + errors);
+
+                Logger.Log("Virus scan completed. Output:\n" + output);
             }
             catch (Exception ex)
             {
