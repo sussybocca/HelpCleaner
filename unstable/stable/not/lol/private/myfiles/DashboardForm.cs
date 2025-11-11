@@ -12,17 +12,17 @@ namespace HelpCleaner.Dashboard
 {
     public class DashboardForm : Form
     {
-        private Button scanButton;
-        private Button cleanButton;
-        private Button dangerousFilesButton;
-        private Button vhdButton;
-        private Label storageLabel;
+        private Button? scanButton;
+        private Button? cleanButton;
+        private Button? dangerousFilesButton;
+        private Button? vhdButton;
+        private Label? storageLabel;
         private StorageAnalyzer storageAnalyzer;
 
         // Emoji buttons
-        private Button btnClose;
-        private Button btnMinimize;
-        private Button btnInstall;
+        private Button? btnClose;
+        private Button? btnMinimize;
+        private Button? btnInstall;
 
         // Dragging variables
         private bool dragging = false;
@@ -100,29 +100,27 @@ namespace HelpCleaner.Dashboard
             // --- Adjust emoji buttons on resize ---
             this.Resize += (s, e) =>
             {
-                btnClose.Left = this.ClientSize.Width - 50;
-                btnMinimize.Left = this.ClientSize.Width - 100;
-                btnInstall.Left = this.ClientSize.Width - 170;
+                if (btnClose != null) btnClose.Left = this.ClientSize.Width - 50;
+                if (btnMinimize != null) btnMinimize.Left = this.ClientSize.Width - 100;
+                if (btnInstall != null) btnInstall.Left = this.ClientSize.Width - 170;
             };
         }
 
-        // --- Old working button handlers ---
-        private void ScanButton_Click(object? sender, EventArgs? e)
+        // --- Button handlers ---
+        private void ScanButton_Click(object? sender, EventArgs e)
         {
             var virusScanner = new VirusScanner();
             virusScanner.ScanSystem();
             MessageBox.Show("Virus scan completed. Check HelpCleaner.log for details.");
         }
 
-        private void CleanButton_Click(object? sender, EventArgs? e)
+        private void CleanButton_Click(object? sender, EventArgs e)
         {
             var scanner = new FileScanner();
-            var files = scanner.ScanFiles();
-            scanner.DeleteFilesWithConfirmation(files);
-            MessageBox.Show($"Deleted {files.Count} files (or skipped some). Check HelpCleaner.log for details.");
+            scanner.ScanAndDelete(); // new unified method handles everything
         }
 
-        private void DangerousFilesButton_Click(object? sender, EventArgs? e)
+        private void DangerousFilesButton_Click(object? sender, EventArgs e)
         {
             var manager = new DangerousFilesManager();
             string path = "C:\\";
@@ -131,7 +129,7 @@ namespace HelpCleaner.Dashboard
             MessageBox.Show(message);
         }
 
-        private void VhdButton_Click(object? sender, EventArgs? e)
+        private void VhdButton_Click(object? sender, EventArgs e)
         {
             var vhdManager = new VHDManager();
             vhdManager.CreateVHD();
@@ -141,6 +139,8 @@ namespace HelpCleaner.Dashboard
 
         private void UpdateStorageStats()
         {
+            if (storageLabel == null) return;
+
             string drivesInfo = "";
             foreach (var drive in DriveInfo.GetDrives())
             {
