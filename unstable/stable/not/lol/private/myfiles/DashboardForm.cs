@@ -6,7 +6,7 @@ using System.Windows.Forms;
 using HelpCleaner.Cleaner;
 using HelpCleaner.VirtualDrive;
 using HelpCleaner.Storage;
-using HelpCleaner.Utils; // Needed for CleanerUtils
+using HelpCleaner.Utils;
 
 namespace HelpCleaner.Dashboard
 {
@@ -19,16 +19,22 @@ namespace HelpCleaner.Dashboard
         private Label storageLabel;
         private StorageAnalyzer storageAnalyzer;
 
-        // New emoji buttons
+        // Emoji buttons
         private Button btnClose;
         private Button btnMinimize;
         private Button btnInstall;
+
+        // Dragging variables
+        private bool dragging = false;
+        private Point dragCursorPoint;
+        private Point dragFormPoint;
 
         public DashboardForm()
         {
             this.Text = "HelpCleaner";
             this.Width = 600;
             this.Height = 450; // Taller to fit storage info
+            this.FormBorderStyle = FormBorderStyle.None; // Borderless for draggable feature
 
             storageAnalyzer = new StorageAnalyzer();
 
@@ -38,7 +44,7 @@ namespace HelpCleaner.Dashboard
 
         private void InitializeComponents()
         {
-            // Old working buttons
+            // --- Old working buttons ---
             scanButton = new Button() { Text = "Check My System for Viruses", Left = 50, Top = 50, Width = 200 };
             cleanButton = new Button() { Text = "Clean System", Left = 50, Top = 100, Width = 200 };
             dangerousFilesButton = new Button() { Text = "Access Dangerous Files", Left = 50, Top = 150, Width = 200 };
@@ -54,7 +60,7 @@ namespace HelpCleaner.Dashboard
             this.Controls.Add(dangerousFilesButton);
             this.Controls.Add(vhdButton);
 
-            // Storage label
+            // --- Storage label ---
             storageLabel = new Label()
             {
                 Left = 300,
@@ -66,18 +72,18 @@ namespace HelpCleaner.Dashboard
             };
             this.Controls.Add(storageLabel);
 
-            // --- New emoji buttons (added on top) ---
-            btnClose = new Button() { Text = "❌", Width = 40, Height = 30, Top = 10, Left = this.ClientSize.Width - 50, FlatStyle = FlatStyle.Flat, BackColor = Color.Transparent };
+            // --- Emoji buttons ---
+            btnClose = new Button() { Text = "❌", Width = 40, Height = 30, Top = 10, FlatStyle = FlatStyle.Flat, BackColor = Color.Transparent };
             btnClose.Click += (s, e) => this.Close();
             btnClose.MouseEnter += (s, e) => btnClose.BackColor = Color.Red;
             btnClose.MouseLeave += (s, e) => btnClose.BackColor = Color.Transparent;
 
-            btnMinimize = new Button() { Text = "➖", Width = 40, Height = 30, Top = 10, Left = this.ClientSize.Width - 100, FlatStyle = FlatStyle.Flat, BackColor = Color.Transparent };
+            btnMinimize = new Button() { Text = "➖", Width = 40, Height = 30, Top = 10, FlatStyle = FlatStyle.Flat, BackColor = Color.Transparent };
             btnMinimize.Click += (s, e) => this.WindowState = FormWindowState.Minimized;
             btnMinimize.MouseEnter += (s, e) => btnMinimize.BackColor = Color.Gray;
             btnMinimize.MouseLeave += (s, e) => btnMinimize.BackColor = Color.Transparent;
 
-            btnInstall = new Button() { Text = "🛠 Install", Width = 60, Height = 30, Top = 10, Left = this.ClientSize.Width - 170, FlatStyle = FlatStyle.Flat, BackColor = Color.Transparent };
+            btnInstall = new Button() { Text = "🛠 Install", Width = 60, Height = 30, Top = 10, FlatStyle = FlatStyle.Flat, BackColor = Color.Transparent };
             btnInstall.Click += (s, e) => MessageBox.Show("Installer requires elevated permissions.", "Install", MessageBoxButtons.OK, MessageBoxIcon.Information);
             btnInstall.MouseEnter += (s, e) => btnInstall.BackColor = Color.DarkOrange;
             btnInstall.MouseLeave += (s, e) => btnInstall.BackColor = Color.Transparent;
@@ -86,7 +92,12 @@ namespace HelpCleaner.Dashboard
             this.Controls.Add(btnMinimize);
             this.Controls.Add(btnInstall);
 
-            // Keep emoji buttons in correct position on resize
+            // --- Drag window events ---
+            this.MouseDown += DashboardForm_MouseDown;
+            this.MouseMove += DashboardForm_MouseMove;
+            this.MouseUp += DashboardForm_MouseUp;
+
+            // --- Adjust emoji buttons on resize ---
             this.Resize += (s, e) =>
             {
                 btnClose.Left = this.ClientSize.Width - 50;
@@ -95,7 +106,7 @@ namespace HelpCleaner.Dashboard
             };
         }
 
-        // --- Old working button event handlers ---
+        // --- Old working button handlers ---
         private void ScanButton_Click(object? sender, EventArgs? e)
         {
             var virusScanner = new VirusScanner();
@@ -153,6 +164,27 @@ namespace HelpCleaner.Dashboard
                 len /= 1024;
             }
             return $"{len:F2} {sizes[order]}";
+        }
+
+        // --- Draggable window methods ---
+        private void DashboardForm_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Left) return;
+            dragging = true;
+            dragCursorPoint = Cursor.Position;
+            dragFormPoint = this.Location;
+        }
+
+        private void DashboardForm_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (!dragging) return;
+            Point diff = Point.Subtract(Cursor.Position, new Size(dragCursorPoint));
+            this.Location = Point.Add(dragFormPoint, new Size(diff));
+        }
+
+        private void DashboardForm_MouseUp(object sender, MouseEventArgs e)
+        {
+            dragging = false;
         }
     }
 }
